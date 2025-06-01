@@ -6,6 +6,7 @@ import datetime
 import yfinance as yf
 
 DB_PATH = "data/tickers.db"
+CANDIDATES_DB_PATH = "data/candidates.db"
 SOURCE_TABLE = "us_tickers"
 TARGET_TABLE = "ticker_info"
 SLEEP_TIME = 1  # Delay to avoid Yahoo Finance rate limits
@@ -28,7 +29,6 @@ SECTOR_ETF_MAP = {
     "Real Estate": "XLRE",
     "Communication Services": "XLC"
 }
-
 
 def get_or_fetch_return(symbol, period, conn):
     today = datetime.date.today().isoformat()
@@ -108,7 +108,6 @@ def alter_ticker_info_add_last_check(db_path="data/tickers.db"):
         print("✅ Added column 'last_dividend_check'")
     conn.close()
 
-
 def fetch_ticker_info(ticker):
     try:
         yf_obj = yf.Ticker(ticker)
@@ -151,16 +150,6 @@ def enrich_tickers():
     df.to_sql(TARGET_TABLE, conn, if_exists="replace", index=False)
     conn.close()
     print(f"Inserted {len(df)} records into {TARGET_TABLE}.")
-
-def display_sample_tickers(n=10):
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        df = pd.read_sql(f"SELECT * FROM {TARGET_TABLE} LIMIT {n}", conn)
-        print(df)
-    except Exception as e:
-        print(f"Error displaying sample data: {e}")
-    finally:
-        conn.close()
 
 def list_large_optionable_tickers(min_cap=10_000_000):
     conn = sqlite3.connect(DB_PATH)
@@ -237,21 +226,6 @@ def check_outperformance_vs_sector_etf(ticker_list, period="1mo"):
     import yfinance as yf
     import sqlite3
     import pandas as pd
-
-
-    SECTOR_ETF_MAP = {
-        "Technology": "XLK",
-        "Financial Services": "XLF",
-        "Healthcare": "XLV",
-        "Energy": "XLE",
-        "Consumer Defensive": "XLP",
-        "Consumer Cyclical": "XLY",
-        "Industrials": "XLI",
-        "Utilities": "XLU",
-        "Basic Materials": "XLB",
-        "Real Estate": "XLRE",
-        "Communication Services": "XLC"
-    }
 
     conn = sqlite3.connect(DB_PATH)
 
@@ -342,131 +316,6 @@ def check_outperformance_vs_sector_etf(ticker_list, period="1mo"):
     finally:
         conn.close()
 
-def get_today_string():
-    today = datetime.date.today().isoformat()
-    return today
-
-def get_candidates(limit=10, only_outperforming=False, only_with_dividends=False):
-    db_path = "data/candidates.db"
-    conn = sqlite3.connect(db_path)
-
-    try:
-        query = "SELECT * FROM candidates"
-        filters = []
-
-        if only_outperforming:
-            filters.append("outperforming = 1")
-        if only_with_dividends:
-            filters.append("has_dividend = 1")
-
-        if filters:
-            query += " WHERE " + " AND ".join(filters)
-
-        query += f" ORDER BY return_pct DESC LIMIT {limit}"
-
-        df = pd.read_sql(query, conn)
-        return df
-
-    finally:
-        conn.close()
-
-
-def main0():
-    #alter_ticker_info_for_dividends()
-    #alter_ticker_info_add_last_check()
-
-    # load database with tickers information
-    # enrich_tickers()
-
-    # display a sample of tickers
-    # display_sample_tickers(10)
-    
-    # extract large optionable tickers
-    df=list_large_optionable_tickers()
-
-
-    #tickers = ["AAPL", "JPM", "XOM", "PG", "TSLA"]
-    tickers = df["symbol"].tolist()
-    candidates=check_outperformance_vs_sector_etf(tickers, period="3mo")
-
-def display_candidates_by_sector(only_outperforming=False, only_with_dividends=False):
-    import sqlite3
-    import pandas as pd
-
-    db_path = "data/candidates.db"
-    conn = sqlite3.connect(db_path)
-
-    # Mapping sector → ETF
-    SECTOR_ETF_MAP = {
-        "Technology": "XLK",
-        "Financial Services": "XLF",
-        "Healthcare": "XLV",
-        "Energy": "XLE",
-        "Consumer Defensive": "XLP",
-        "Consumer Cyclical": "XLY",
-        "Industrials": "XLI",
-        "Utilities": "XLU",
-        "Basic Materials": "XLB",
-        "Real Estate": "XLRE",
-        "Communication Services": "XLC"
-    }
-
-    try:
-        # Build base query
-        query = "SELECT * FROM candidates"
-        filters = []
-
-        if only_outperforming:
-            filters.append("outperforming = 1")
-        if only_with_dividends:
-            filters.append("has_dividend = 1")
-
-        if filters:
-            query += " WHERE " + " AND ".join(filters)
-
-        df = pd.read_sql(query, conn)
-
-        if df.empty:
-            print("No data found.")
-            return df
-
-        # Group by sector
-        summary = df.groupby("sector").agg(
-            tickers=("symbol", list),
-            avg_return_pct=("return_pct", "mean"),
-            count=("symbol", "count"),
-            dividend_count=("has_dividend", "sum"),
-            avg_days_to_div=("days_until_dividend", lambda x: round(x.dropna().mean(), 1) if not x.dropna().empty else None)
-        ).sort_values(by="avg_return_pct", ascending=False)
-
-        # Add ETF name column
-        summary["sector_etf"] = summary.index.map(SECTOR_ETF_MAP.get)
-
-        # Print
-        for sector, row in summary.iterrows():
-            print(f"\n📊 {sector} (ETF: {row['sector_etf']})")
-            print(f"   ➤ Tickers: {', '.join(row['tickers'])}")
-            print(f"   ➤ Avg Return: {row['avg_return_pct']:.2f}%")
-            print(f"   ➤ Total: {row['count']} tickers, {row['dividend_count']} with dividends")
-            if row['avg_days_to_div'] is not None:
-                print(f"   ➤ Avg days to dividend: {row['avg_days_to_div']} days")
-
-        return summary
-
-    finally:
-        conn.close()
-
-
-def tmain():
-    print(get_today_string())  # ➜ "2025-06-01"
-
-def main2():
-    df = get_candidates(limit=100, only_outperforming=True, only_with_dividends=True)
-    print(df)
-
-def main3():
-    display_candidates_by_sector(only_outperforming=True, only_with_dividends=True)
-
 def main():
 
     # load database with tickers information
@@ -474,7 +323,7 @@ def main():
     alter_ticker_info_for_dividends()
     alter_ticker_info_add_last_check()
 
-    df=list_large_optionable_tickers()
+    df=list_large_optionable_tickers(min_cap=10_000_000)
     tickers = df["symbol"].tolist()
     candidates = check_outperformance_vs_sector_etf(tickers, period="3mo")
     print(candidates)

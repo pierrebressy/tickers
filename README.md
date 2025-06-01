@@ -28,6 +28,9 @@ The script `03-process-candidates-db.py` will display various informations extra
 ```
 
 
+
+# Database structure and usage
+
 ## sqlite3 db usage
 ```bash
 sqlite3 data/tickers.db

@@ -3,25 +3,26 @@ import pandas as pd
 
 DB_PATH = "data/candidates.db"
 
+SECTOR_ETF_MAP = {
+    "Technology": "XLK",
+    "Financial Services": "XLF",
+    "Healthcare": "XLV",
+    "Energy": "XLE",
+    "Consumer Defensive": "XLP",
+    "Consumer Cyclical": "XLY",
+    "Industrials": "XLI",
+    "Utilities": "XLU",
+    "Basic Materials": "XLB",
+    "Real Estate": "XLRE",
+    "Communication Services": "XLC"
+}
+
+
 def display_candidates_by_sector(only_outperforming=False, only_with_dividends=False):
     
     conn = sqlite3.connect(DB_PATH)
 
     # Mapping sector → ETF
-    SECTOR_ETF_MAP = {
-        "Technology": "XLK",
-        "Financial Services": "XLF",
-        "Healthcare": "XLV",
-        "Energy": "XLE",
-        "Consumer Defensive": "XLP",
-        "Consumer Cyclical": "XLY",
-        "Industrials": "XLI",
-        "Utilities": "XLU",
-        "Basic Materials": "XLB",
-        "Real Estate": "XLRE",
-        "Communication Services": "XLC"
-    }
-
     try:
         # Build base query
         query = "SELECT * FROM candidates"
