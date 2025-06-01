@@ -31,6 +31,8 @@ def store_in_database(df, db_file):
         df.to_sql("us_tickers", conn, if_exists="replace", index=False)
         print(f"Stored {len(df)} tickers in {db_file}.")
 
+
+
 if __name__ == "__main__":
     tickers_df = process_files(NASDAQ_FILE, NYSE_FILE)
     store_in_database(tickers_df, DB_FILE)
