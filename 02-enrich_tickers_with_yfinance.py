@@ -49,7 +49,7 @@ def get_or_fetch_return(symbol, period, conn):
         if hist.empty or len(hist) < 2:
             return None
         ret = (hist["Close"].iloc[-1] - hist["Close"].iloc[0]) / hist["Close"].iloc[0]
-        return_pct = round(ret * 100, 4)
+        return_pct = round(ret, 4)
     except:
         return None
 
@@ -106,6 +106,20 @@ def alter_ticker_info_add_last_check(db_path="data/tickers.db"):
         cur.execute("ALTER TABLE ticker_info ADD COLUMN last_dividend_check TEXT")
         conn.commit()
         print("✅ Added column 'last_dividend_check'")
+    conn.close()
+
+def alter_price_cache_add_close_price(db_path="data/tickers.db"):
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(price_cache)")
+    cols = [row[1] for row in cur.fetchall()]
+    if "close_price" not in cols:
+        cur.execute("ALTER TABLE price_cache ADD COLUMN close_price REAL")
+        conn.commit()
+        print("✅ Added 'close_price' column to price_cache")
+    else:
+        print("ℹ️ 'close_price' already exists in price_cache")
     conn.close()
 
 def fetch_ticker_info(ticker):
@@ -319,13 +333,14 @@ def check_outperformance_vs_sector_etf(ticker_list, period="1mo"):
 def main():
 
     # load database with tickers information
-    enrich_tickers()
-    alter_ticker_info_for_dividends()
-    alter_ticker_info_add_last_check()
-
+    #enrich_tickers()
+    #alter_ticker_info_for_dividends()
+    #alter_ticker_info_add_last_check()
+    #alter_price_cache_add_close_price()
+    
     df=list_large_optionable_tickers(min_cap=10_000_000)
     tickers = df["symbol"].tolist()
-    candidates = check_outperformance_vs_sector_etf(tickers, period="3mo")
+    candidates = check_outperformance_vs_sector_etf(tickers, period="6mo")
     print(candidates)
 
 if __name__ == "__main__":

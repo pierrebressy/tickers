@@ -1,5 +1,25 @@
 # `Tickers` : find underlyings
 
+## TODO
+- [X] remove QQQ -> DELETE FROM us_tickers WHERE symbol = 'QQQ';
+- [X] remove SPY
+- [X] remove VB
+- [X] remove VTI
+- [X] remove IVV
+
+DELETE FROM us_tickers WHERE symbol = 'QQQ';
+DELETE FROM us_tickers WHERE symbol = 'SPY';
+DELETE FROM us_tickers WHERE symbol = 'VB';
+DELETE FROM us_tickers WHERE symbol = 'VTI';
+DELETE FROM us_tickers WHERE symbol = 'IVV';
+
+DELETE FROM ticker_info WHERE symbol = 'QQQ';
+DELETE FROM ticker_info WHERE symbol = 'SPY';
+DELETE FROM ticker_info WHERE symbol = 'VB';
+DELETE FROM ticker_info WHERE symbol = 'VTI';
+DELETE FROM ticker_info WHERE symbol = 'IVV';
+
+
 ## Modus operandi
 
 ### 1. Create a SQLite database from the list of tickers
@@ -20,15 +40,39 @@ The script `02-enrich_tickers_with_yfinance.py` will fetch information about eac
 1   AAPL  Technology        XLK    -1684.03          256.53          False             1                None   2025-06-01
 ```
 
-### 3. Process the data
-The script `03-process-candidates-db.py` will display various informations extracted from the database.
+### 3. Process the data
+The script `03-process-candidates-db.py` will display various informations extracted from the database :
+- list of tickers with their sector
+- performance of each ticker  
+- performance of each sector
+- direct link to finviz.com to access the data
 
 ```bash
 > python3 03-process-candidates-db.py
 ```
+### 6. Get sectors performances
+The script `06-sectors-performances.py` will calculate and display the performance of each sector.
 
+```bash
+> python3 06-sectors-performances.py
+     Ticker |  Perf Week  | Perf Month  | Perf Quart  |  Perf Half  |  Perf Year  |  Perf YTD   |
+-------------------------------------------------------------------------------------------------
+        XLB |       0.75% |       1.66% |       1.11% |      -6.73% |      -3.85% |       4.26% |
+        XLC |       1.21% |       4.09% |       1.52% |       1.72% |      23.16% |       4.54% |
+        XLE |      -0.56% |      -0.55% |      -5.52% |     -10.16% |      -9.65% |      -5.19% |
+        XLF |       1.82% |       2.41% |       2.45% |       2.20% |      24.29% |       6.09% |
+        XLI |       1.41% |       6.12% |       8.72% |       0.93% |      17.35% |       9.11% |
+        XLK |       1.81% |       6.60% |       5.87% |      -3.91% |      10.64% |      -0.28% |
+        XLP |       1.51% |       1.56% |       1.42% |       1.75% |       9.88% |       6.25% |
+       XLRE |       2.68% |      -0.48% |      -2.38% |      -3.39% |      13.48% |       4.24% |
+        XLU |       1.06% |       2.72% |       5.72% |       3.41% |      16.09% |       8.17% |
+        XLV |       1.76% |      -4.25% |     -10.15% |      -8.85% |      -6.21% |      -3.24% |
+        XLY |       1.50% |       6.14% |       2.95% |      -5.02% |      22.58% |      -3.17% |
 
+```
 
+___
+___
 # Database structure and usage
 
 ## sqlite3 db usage
