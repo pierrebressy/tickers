@@ -99,6 +99,6 @@ def main():
     sector_etfs = sorted(SECTOR_ETF_MAP.values())
     sector_perf_df = get_performance_table(sector_etfs)
     print_color_table_with_header(sector_perf_df)
-
+    
 if __name__ == "__main__":
     main()

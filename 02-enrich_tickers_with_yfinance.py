@@ -73,7 +73,7 @@ def init_cache_table(conn):
     """)
     conn.commit()
 
-def alter_ticker_info_for_dividends(db_path="data/tickers.db"):
+def alter_ticker_info_for_dividends(db_path):
 
     fields_to_add = {
         "has_dividend": "BOOLEAN",
@@ -97,7 +97,7 @@ def alter_ticker_info_for_dividends(db_path="data/tickers.db"):
     conn.close()
     print("✅ Table 'ticker_info' updated with dividend fields.")
 
-def alter_ticker_info_add_last_check(db_path="data/tickers.db"):
+def alter_ticker_info_add_last_check(db_path):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute("PRAGMA table_info(ticker_info)")
@@ -108,7 +108,7 @@ def alter_ticker_info_add_last_check(db_path="data/tickers.db"):
         print("✅ Added column 'last_dividend_check'")
     conn.close()
 
-def alter_price_cache_add_close_price(db_path="data/tickers.db"):
+def alter_price_cache_add_close_price(db_path):
     import sqlite3
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
@@ -145,46 +145,48 @@ def fetch_ticker_info(ticker):
         print(f"Error fetching {ticker}: {e}")
         return None
 
-def enrich_tickers():
-    conn = sqlite3.connect(DB_PATH)
-    tickers = pd.read_sql(f"SELECT DISTINCT Symbol FROM {SOURCE_TABLE}", conn)["Symbol"].tolist()
+def enrich_tickers(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Ensure 'processed' column exists in SOURCE_TABLE
+    cursor.execute(f"PRAGMA table_info({SOURCE_TABLE})")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'processed' not in columns:
+        print("Adding 'processed' column to SOURCE_TABLE...")
+        cursor.execute(f"ALTER TABLE {SOURCE_TABLE} ADD COLUMN processed INTEGER DEFAULT 0")
+        conn.commit()
+
+    # Get unprocessed tickers
+    query = f"SELECT DISTINCT Symbol FROM {SOURCE_TABLE} WHERE processed IS NULL OR processed = 0"
+    tickers = pd.read_sql(query, conn)["Symbol"].tolist()
+
+    if not tickers:
+        print("All tickers already processed. Nothing to do.")
+        conn.close()
+        return
 
     enriched_data = []
-    count=0
     for i, ticker in enumerate(tickers):
         print(f"[{i+1}/{len(tickers)}] Fetching {ticker}...")
         data = fetch_ticker_info(ticker)
         if data:
             enriched_data.append(data)
-        time.sleep(SLEEP_TIME)  # Sleep to avoid throttling
-        count += 1
-        #if count % 10 == 0:
-        #    break
-    df = pd.DataFrame(enriched_data, columns=FIELDS)
-    df.to_sql(TARGET_TABLE, conn, if_exists="replace", index=False)
+            # Mark ticker as processed
+            cursor.execute(f"UPDATE {SOURCE_TABLE} SET processed = 1 WHERE Symbol = ?", (ticker,))
+            conn.commit()
+        time.sleep(SLEEP_TIME)  # Avoid throttling
+
+    if enriched_data:
+        df = pd.DataFrame(enriched_data, columns=FIELDS)
+        df.to_sql(TARGET_TABLE, conn, if_exists="append", index=False)
+        print(f"Inserted {len(df)} new records into {TARGET_TABLE}.")
+    else:
+        print("No new data to insert.")
+
     conn.close()
-    print(f"Inserted {len(df)} records into {TARGET_TABLE}.")
 
-def list_large_optionable_tickers(min_cap=10_000_000):
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        query = f"""
-            SELECT symbol, longName, marketCap, sector, industry, exchange
-            FROM {TARGET_TABLE}
-            WHERE marketCap > ? AND isOptionable = 1
-            ORDER BY marketCap DESC
-            LIMIT 100
-        """
-        df = pd.read_sql(query, conn, params=(min_cap,))
-        print(df)
-        return df
-    except Exception as e:
-        print(f"Error querying database: {e}")
-        return pd.DataFrame()
-    finally:
-        conn.close()
-
-def update_dividend_info(symbol, conn, force=False):
+def UNUSED_update_dividend_info(symbol, conn, force=False):
     from datetime import date, timedelta
     import yfinance as yf
     import pandas as pd
@@ -194,7 +196,7 @@ def update_dividend_info(symbol, conn, force=False):
     if not force:
         # Skip if already updated today
         cursor = conn.execute("""
-            SELECT last_dividend_check FROM ticker_info WHERE symbol = ?
+            SELECT last_dividend_check FROM {TARGET_TABLE} WHERE symbol = ?
         """, (symbol,))
         row = cursor.fetchone()
         if row and row[0] == today_str:
@@ -225,7 +227,7 @@ def update_dividend_info(symbol, conn, force=False):
 
         # Store in DB
         conn.execute("""
-            UPDATE ticker_info
+            UPDATE {TARGET_TABLE}
             SET has_dividend = ?, next_dividend_date = ?, days_until_dividend = ?, last_dividend_check = ?
             WHERE symbol = ?
         """, (has_dividend, next_div_date, days_until, today_str, symbol))
@@ -236,112 +238,12 @@ def update_dividend_info(symbol, conn, force=False):
     except Exception as e:
         print(f"❌ Dividend update failed for {symbol}: {e}")
 
-def check_outperformance_vs_sector_etf(ticker_list, period="1mo"):
-    import yfinance as yf
-    import sqlite3
-    import pandas as pd
-
-    conn = sqlite3.connect(DB_PATH)
-
-    init_cache_table(conn)
-
-    try:
-        placeholders = ",".join("?" for _ in ticker_list)
-        query = f"SELECT symbol, sector FROM {TARGET_TABLE} WHERE symbol IN ({placeholders})"
-        ticker_sectors = pd.read_sql(query, conn, params=ticker_list)
-
-        if ticker_sectors.empty:
-            print("No ticker info found.")
-            return pd.DataFrame()
-
-        results = []
-        price_cache = {}
-
-        def get_return(symbol):
-            if symbol in price_cache:
-                return price_cache[symbol]
-            try:
-                hist = yf.Ticker(symbol).history(period=period)
-                if hist.empty or len(hist) < 2:
-                    return None
-                ret = (hist["Close"].iloc[-1] - hist["Close"].iloc[0]) / hist["Close"].iloc[0]
-                price_cache[symbol] = ret
-                return ret
-            except:
-                return None
-
-        for idx, row in ticker_sectors.iterrows():
-            symbol = row["symbol"]
-            sector = row["sector"]
-            print(f"[{idx+1}/{len(ticker_sectors)}] {symbol}: sector={sector}")
-
-            # 1. Update dividend info
-            update_dividend_info(symbol, conn)
-            # Fetch updated dividend info
-            cursor = conn.execute("""
-                SELECT has_dividend, days_until_dividend
-                FROM ticker_info
-                WHERE symbol = ?
-            """, (symbol,))
-            div_row = cursor.fetchone()
-
-            has_dividend = div_row[0] if div_row else None
-            days_until = div_row[1] if div_row else None
-
-            # 2. Get ticker return
-            ticker_ret = get_or_fetch_return(symbol, period, conn)
-            if ticker_ret is None:
-                continue
-
-            # 3. Get sector ETF return
-            sector_etf = SECTOR_ETF_MAP.get(sector)
-            if not sector_etf:
-                print(f"⚠️ No ETF found for sector '{sector}'")
-                continue
-
-            etf_ret = get_or_fetch_return(sector_etf, period, conn)
-            if etf_ret is None:
-                continue
-
-            results.append({
-                "symbol": symbol,
-                "sector": sector,
-                "sector_etf": sector_etf,
-                "return_pct": round(ticker_ret * 100, 2),
-                "sector_etf_pct": round(etf_ret * 100, 2),
-                "outperforming": ticker_ret > etf_ret,
-                "has_dividend": has_dividend,
-                "days_until_dividend": days_until
-            })
-
-        df = pd.DataFrame(results)
-        df = df.sort_values(by="return_pct", ascending=False).reset_index(drop=True)
-        # Add timestamp for traceability
-        df["evaluated_at"] = today = datetime.date.today().isoformat()
-
-        # Save to separate database
-        candidates_db = "data/candidates.db"
-        with sqlite3.connect(candidates_db) as out_conn:
-            df.to_sql("candidates", out_conn, if_exists="replace", index=False)
-
-        print(f"✅ Stored {len(df)} rows in {candidates_db} (table: candidates)")
-        return df
-
-    finally:
-        conn.close()
-
 def main():
 
-    # load database with tickers information
-    #enrich_tickers()
-    #alter_ticker_info_for_dividends()
-    #alter_ticker_info_add_last_check()
-    #alter_price_cache_add_close_price()
+    enrich_tickers(DB_PATH)
+    alter_ticker_info_for_dividends(DB_PATH)
+    alter_ticker_info_add_last_check(DB_PATH)
+    alter_price_cache_add_close_price(DB_PATH)
     
-    df=list_large_optionable_tickers(min_cap=10_000_000)
-    tickers = df["symbol"].tolist()
-    candidates = check_outperformance_vs_sector_etf(tickers, period="6mo")
-    print(candidates)
-
 if __name__ == "__main__":
     main()

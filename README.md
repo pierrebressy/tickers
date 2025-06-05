@@ -1,37 +1,36 @@
 # `Tickers` : find underlyings
 
-## TODO
-- [X] remove QQQ -> DELETE FROM us_tickers WHERE symbol = 'QQQ';
-- [X] remove SPY
-- [X] remove VB
-- [X] remove VTI
-- [X] remove IVV
-
-DELETE FROM us_tickers WHERE symbol = 'QQQ';
-DELETE FROM us_tickers WHERE symbol = 'SPY';
-DELETE FROM us_tickers WHERE symbol = 'VB';
-DELETE FROM us_tickers WHERE symbol = 'VTI';
-DELETE FROM us_tickers WHERE symbol = 'IVV';
-
-DELETE FROM ticker_info WHERE symbol = 'QQQ';
-DELETE FROM ticker_info WHERE symbol = 'SPY';
-DELETE FROM ticker_info WHERE symbol = 'VB';
-DELETE FROM ticker_info WHERE symbol = 'VTI';
-DELETE FROM ticker_info WHERE symbol = 'IVV';
-
-
 ## Modus operandi
 
 ### 1. Create a SQLite database from the list of tickers
+
 The script `01-create-db-from-tickers-list.py` will use the  list of tickers from NASDAQ and create a SQLite database with the table `us_tickers`.
+
+To be run only once.
 
 ```bash
 > python3 01-create-db-from-tickers-list.py
 Stored 11376 tickers in data/tickers.db.
 ```
 
+For postprocessing, remove some tickers that are not relevant for our analysis, such as ETFs or indices. You can do this by executing the following SQL commands in the SQLite database:
+```bash
+sqlite3 data/tickers.db
+```
+```sql
+DELETE FROM us_tickers WHERE symbol = 'QQQ';
+DELETE FROM us_tickers WHERE symbol = 'SPY';
+DELETE FROM us_tickers WHERE symbol = 'VB';
+DELETE FROM us_tickers WHERE symbol = 'VTI';
+DELETE FROM us_tickers WHERE symbol = 'IVV';
+```
+
 ### 2. Fetch ticker information
-The script `02-enrich_tickers_with_yfinance.py` will fetch information about each ticker from Yahoo Finance and store it in the `ticker_info` table of the SQLite database.
+The script `02-enrich_tickers_with_yfinance.py` will fetch information about each ticker from `us_tickers` table, from Yahoo Finance and store it in the `ticker_info` table of the SQLite database.
+
+To avoid long duration during update, the tickers that are already processed (`processed=1` in `us_tickers` table) will not be processed again.
+
+When processed, the script update the `ticker_info` table with the following columns and sets the `processed` flag to 1 in the `us_tickers` table.
 
 ```bash
 > python3 02-enrich_tickers_with_yfinance.py
@@ -40,21 +39,36 @@ The script `02-enrich_tickers_with_yfinance.py` will fetch information about eac
 1   AAPL  Technology        XLK    -1684.03          256.53          False             1                None   2025-06-01
 ```
 
-### 3. Process the data
-The script `03-process-candidates-db.py` will display various informations extracted from the database :
-- list of tickers with their sector
-- performance of each ticker  
-- performance of each sector
-- direct link to finviz.com to access the data
+### 3. Create a databa for candidates tickers
+
+The script `03-create-candidates-db.py` will create a new SQLite database `data/candidates.db` from the `ticker_info` table, which will contain only the tickers that are relevant with specific criteria:
+- Market cap greater than 100_000_000_000 USD
+- Tickers that superform the sector ETF over the last 6 months
 
 ```bash
-> python3 03-process-candidates-db.py
+> python3 03-create-candidate-db.py
 ```
-### 6. Get sectors performances
-The script `06-sectors-performances.py` will calculate and display the performance of each sector.
+
+
+
+
+
+### 4. Process the candidates database
+
+The script `04-process-candidates-db.py` will display various informations extracted from the database :
+- list of tickers with their sector
+- direct link to finviz.com to access the data, by sector,
+- performance of each sector (week, monmth, quarter, half-year, year, YTD),
 
 ```bash
-> python3 06-sectors-performances.py
+> python3 04-process-candidates-db.py
+```
+
+### 5. Get sectors performances
+The script `05-sectors-performances.py` will calculate and display the performance of each sector.
+
+```bash
+> python3 05-sectors-performances.py
      Ticker |  Perf Week  | Perf Month  | Perf Quart  |  Perf Half  |  Perf Year  |  Perf YTD   |
 -------------------------------------------------------------------------------------------------
         XLB |       0.75% |       1.66% |       1.11% |      -6.73% |      -3.85% |       4.26% |

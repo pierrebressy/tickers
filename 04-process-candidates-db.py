@@ -110,10 +110,10 @@ def display_candidates_by_sector(only_outperforming=False, only_with_dividends=F
         for sector, row in summary.iterrows():
             print(f"\n📊 {sector} (ETF: {row['sector_etf']})")
             print(f"   ➤ Tickers: {', '.join(row['tickers'])}")
-            print(f"   ➤ Avg Return: {row['avg_return_pct']:.2f}%")
-            print(f"   ➤ Total: {row['count']} tickers, {row['dividend_count']} with dividends")
-            if row['avg_days_to_div'] is not None:
-                print(f"   ➤ Avg days to dividend: {row['avg_days_to_div']} days")
+            #print(f"   ➤ Avg Return: {row['avg_return_pct']:.2f}%")
+            #print(f"   ➤ Total: {row['count']} tickers, {row['dividend_count']} with dividends")
+            #if row['avg_days_to_div'] is not None:
+            #    print(f"   ➤ Avg days to dividend: {row['avg_days_to_div']} days")
 
         return summary
 
