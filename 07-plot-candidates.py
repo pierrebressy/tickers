@@ -4,6 +4,22 @@ import os
 import datetime
 import matplotlib.pyplot as plt
 
+SECTOR_ETF_MAP = {
+    "Technology": "XLK",
+    "Financial Services": "XLF",
+    "Healthcare": "XLV",
+    "Energy": "XLE",
+    "Consumer Defensive": "XLP",
+    "Consumer Cyclical": "XLY",
+    "Industrials": "XLI",
+    "Utilities": "XLU",
+    "Basic Materials": "XLB",
+    "Real Estate": "XLRE",
+    "Communication Services": "XLC"
+}
+
+
+
 def get_or_fetch_price(symbol, conn, today=None):
     import datetime
     import yfinance as yf
@@ -162,11 +178,6 @@ def unused_plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs"):
     plt.show()
 
 
-import os
-import matplotlib.pyplot as plt
-import pandas as pd
-import sqlite3
-
 def plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs", output_dir="./etf_charts"):
     if not tickers:
         print(f"No tickers found for ETF '{etf}'.")
@@ -228,6 +239,54 @@ def plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs", output_dir
     plt.savefig(save_path, dpi=300)
     plt.close()
     print(f"Saved plot to {save_path}")
+
+def plot_all_sector_etfs_relative(etf_list, base_path="./ticker_dbs", output_path="./etf_charts/all_etfs_relative.png"):
+    import matplotlib.pyplot as plt
+    import os
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    plt.figure(figsize=(14, 7))
+
+    data = []
+    for etf in etf_list:
+        db_path = os.path.join(base_path, f"{etf}.db")
+        if not os.path.exists(db_path):
+            print(f"DB for {etf} not found. Skipping.")
+            continue
+
+        try:
+            with sqlite3.connect(db_path) as conn:
+                df = pd.read_sql("SELECT Date, Close FROM history", conn, parse_dates=["Date"])
+                df.sort_values("Date", inplace=True)
+                df["Pct"] = (df["Close"] / df["Close"].iloc[0] - 1) * 100
+                last_price = df["Close"].iloc[-1]
+                label = f"{etf} (${last_price:.2f})"
+                data.append((etf, df["Date"], df["Pct"], label))
+        except Exception as e:
+            print(f"Error reading {etf}: {e}")
+            continue
+
+    # Optional: sort by last performance
+    data.sort(key=lambda x: x[2].iloc[-1])  # Sort by last % return
+
+    for etf, dates, pct, label in data:
+        plt.plot(dates, pct, label=label)
+
+    plt.title("Sector ETFs — Relative Performance (%)")
+    plt.xlabel("Date")
+    plt.ylabel("Performance vs start (%)")
+    plt.axhline(0, color='gray', linestyle='--', linewidth=0.7)
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.close()
+
+    print(f"✅ Saved sector ETF plot to {output_path}")
+
+
+
 def main():
     df_flat = get_flat_candidate_table_with_prices(only_outperforming=True, only_with_dividends=True)
     print(df_flat.sort_values(by=["sector_etf","symbol"], ascending=True))
@@ -239,6 +298,7 @@ def main():
     for etf, tickers in etf_tickers.items():
         plot_etf_tickers_relative(etf, tickers)
 
+    plot_all_sector_etfs_relative(list(SECTOR_ETF_MAP.values()))
 if __name__ == "__main__":
     main()
     #with sqlite3.connect("ticker_dbs/ABBV.db") as conn:
