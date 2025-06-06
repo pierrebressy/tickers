@@ -1,4 +1,0 @@
-Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares
-AAPL|Apple Inc. - Common Stock|Q|N|N|100|N|N
-MSFT|Microsoft Corporation - Common Stock|Q|N|N|100|N|N
-GOOGL|Alphabet Inc. - Class A Common Stock|Q|N|N|100|N|N

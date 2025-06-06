@@ -1,2 +1,0 @@
-ACT Symbol|Security Name|Exchange|CQS Symbol|ETF|Round Lot Size|Test Issue|NASDAQ Symbol
-ABBV|AbbVie Inc. Common Stock|N|ABBV|N|100|N|ABBV

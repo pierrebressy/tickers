@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+    <table>
+        <thead>
+            <tr>
+                <th>Ticker</th>
+                <th>Week</th>
+                <th>Month</th>
+                <th>Quarter</th>
+                <th>Half</th>
+                <th>Year</th>
+                <th>YTD</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in table_data %}
+            <tr>
+                <td>{{ row.Ticker }}</td>
+                {% for key in ["Week", "Month", "Quarter", "Half", "Year", "YTD"] %}
+                    {% set val = row[key] %}
+                    <td class="{{ 'positive' if val is not none and val > 0 else 'negative' if val is not none and val < 0 else '' }}">
+                        {{ "%.2f%%"|format(val) if val is not none else "--" }}
+                    </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+    <p style="font-size: 1.5rem;">⏳ Processing...</p>
+    <script>
+        // Redirige après un court délai (500 ms)
+        setTimeout(function () {
+            window.location.href = "{{ next_url }}";
+        }, 500);
+    </script>
+{% endblock %}

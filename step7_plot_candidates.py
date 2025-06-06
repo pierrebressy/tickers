@@ -1,8 +1,10 @@
+import matplotlib
+matplotlib.use('Agg')  # IMPORTANT: use non-interactive backend BEFORE pyplot import
+import matplotlib.pyplot as plt
+import os
 import sqlite3
 import pandas as pd
-import os
 import datetime
-import matplotlib.pyplot as plt
 
 SECTOR_ETF_MAP = {
     "Technology": "XLK",
@@ -17,8 +19,6 @@ SECTOR_ETF_MAP = {
     "Real Estate": "XLRE",
     "Communication Services": "XLC"
 }
-
-
 
 def get_or_fetch_price(symbol, conn, today=None):
     import datetime
@@ -240,11 +240,7 @@ def plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs", output_dir
     plt.close()
     print(f"Saved plot to {save_path}")
 
-def plot_all_sector_etfs_relative(etf_list, base_path="./ticker_dbs", output_path="./etf_charts/all_etfs_relative.png"):
-    import matplotlib.pyplot as plt
-    import os
-
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+def plot_all_sector_etfs_relative(etf_list, base_path="./ticker_dbs", output_path="static/graphs"):
 
     plt.figure(figsize=(14, 7))
 
@@ -282,12 +278,17 @@ def plot_all_sector_etfs_relative(etf_list, base_path="./ticker_dbs", output_pat
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
     plt.close()
-
     print(f"✅ Saved sector ETF plot to {output_path}")
 
 
 
 def main():
+
+    os.makedirs("static/logs", exist_ok=True)
+    with open("static/logs/generate_graphs.log", "w") as f:
+        f.write("🔄 Starting graph generation...\n")
+
+    output_dir = "static/graphs"
     df_flat = get_flat_candidate_table_with_prices(only_outperforming=True, only_with_dividends=True)
     print(df_flat.sort_values(by=["sector_etf","symbol"], ascending=True))
     grouped = df_flat.groupby("sector_etf")
@@ -296,10 +297,12 @@ def main():
         for etf, group in grouped
     }
     for etf, tickers in etf_tickers.items():
-        plot_etf_tickers_relative(etf, tickers)
+        plot_etf_tickers_relative(etf, tickers, output_dir=output_dir)
 
-    plot_all_sector_etfs_relative(list(SECTOR_ETF_MAP.values()))
+    plot_all_sector_etfs_relative(
+        list(SECTOR_ETF_MAP.values()),
+        output_path=os.path.join(output_dir, "all_etfs_relative.png")
+    )
+
 if __name__ == "__main__":
     main()
-    #with sqlite3.connect("ticker_dbs/ABBV.db") as conn:
-    #    print(pd.read_sql("PRAGMA table_info(history);", conn))

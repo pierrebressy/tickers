@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{{ title or "Tickers Finder" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <h1>{{ title or "Tickers Finder" }}</h1>
+    <div class="button-container">
+        <a href="/enrich-tickers" class="btn">Enrich Tickers</a>
+        <a href="/create-candidate-db" class="btn">Create Candidates DB</a>
+        <a href="/process-candidates-db" class="btn">Process Candidates DB</a>
+        <a href="/sectors-performances" class="btn">Generate Sector Performances</a>
+        <a href="/create-candidates-db-price-history" class="btn">Create Price History</a>
+        <a href="/generate-graphs/live" class="btn">Generate Graphs</a>
+    </div>
+
+    {% block content %}{% endblock %}
+</body>
+
+</html>

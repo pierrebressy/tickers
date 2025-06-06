@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+    <p style="font-size: 1.2rem;">📈 Automatic graph generation in progress...</p>
+    <p id="status" style="margin-top: 1rem; font-style: italic;"></p>
+
+    <script>
+        const status = document.getElementById("status");
+        status.innerText = "⏳ Generation in progress...";
+
+        fetch("/generate-graphs/api", { method: "POST" })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "done") {
+                    status.innerText = "✅ Done! Redirecting...";
+                    setTimeout(() => {
+                        window.location.href = "/";
+                    }, 1500);
+                } else {
+                    status.innerText = "❌ Error during generation.";
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                status.innerText = "❌ Network error.";
+            });
+    </script>
+{% endblock %}

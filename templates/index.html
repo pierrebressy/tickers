@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+    <hr>
+    {% for image in images %}
+        <div>
+            <img src="{{ url_for('get_graph', filename=image) }}" width="1024" height="600" alt="Graph Image">
+        </div>
+    {% endfor %}
+{% endblock %}
