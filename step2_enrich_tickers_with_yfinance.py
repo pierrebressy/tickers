@@ -5,8 +5,8 @@ import time
 import datetime
 import yfinance as yf
 
-DB_PATH = "data/tickers.db"
-CANDIDATES_DB_PATH = "data/candidates.db"
+DB_PATH = "databases/tickers.db"
+CANDIDATES_DB_PATH = "databases/candidates.db"
 SOURCE_TABLE = "us_tickers"
 TARGET_TABLE = "ticker_info"
 SLEEP_TIME = 1  # Delay to avoid Yahoo Finance rate limits

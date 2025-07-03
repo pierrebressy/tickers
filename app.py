@@ -1,16 +1,18 @@
-from flask import Flask, send_from_directory, render_template, redirect, url_for
+from flask import Flask, send_from_directory, render_template, redirect, url_for, session
 from flask import jsonify
+from flask import request
 import os
 import generate_db
 import step1_create_db_from_tickers_list
 import step2_enrich_tickers_with_yfinance
-import step3_create_candidate_db
+import step3_create_candidate_db 
 import step4_process_candidates_db
 from step5_sectors_performances import get_sector_performance_table
 import step6_create_candidates_db_price_history
 import step7_plot_candidates
 
 app = Flask(__name__)
+app.secret_key = "your-secret-key"  # obligatoire pour session
 
 GRAPH_FOLDER = os.path.join('static', 'graphs')
 
@@ -30,9 +32,23 @@ def enrich_tickers_route():
     step2_enrich_tickers_with_yfinance.main()
     return redirect(url_for('index'))
 
-@app.route('/create-candidate-db')
-def create_candidate_db_route():
-    step3_create_candidate_db.main()
+
+
+@app.route('/create-candidate-db', methods=['POST'])
+def create_candidate_db():
+    try:
+        marketcap = float(request.form.get('marketcap'))
+        maxprice = float(request.form.get('maxprice'))
+        period = request.form.get('period', '1y')
+
+    except (TypeError, ValueError):
+        return "Invalid parameters", 400
+    
+    session['marketcap'] = marketcap
+    session['maxprice'] = maxprice
+    session['period'] = period
+
+    step3_create_candidate_db.main(marketcap, maxprice, period)
     return redirect(url_for('index'))
 
 @app.route('/process-candidates-db')

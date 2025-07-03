@@ -5,8 +5,8 @@ import time
 import datetime
 import yfinance as yf
 
-DB_PATH = "data/tickers.db"
-CANDIDATES_DB_PATH = "data/candidates.db"
+DB_PATH = "databases/tickers.db"
+CANDIDATES_DB_PATH = "databases/candidates.db"
 SOURCE_TABLE = "us_tickers"
 TARGET_TABLE = "ticker_info"
 SLEEP_TIME = 1  # Delay to avoid Yahoo Finance rate limits
@@ -80,9 +80,9 @@ def list_large_optionable_tickers(min_cap=10_000_000):
             SELECT symbol, longName, marketCap, sector, industry, exchange
             FROM {TARGET_TABLE}
             WHERE marketCap > ? AND isOptionable = 1
-            ORDER BY marketCap DESC
-            LIMIT 200
+            ORDER BY symbol DESC
         """
+        print(f"Querying for tickers with marketCap > {min_cap} and isOptionable = 1")
         df = pd.read_sql(query, conn, params=(min_cap,))
         print(df)
         return df
@@ -132,7 +132,7 @@ def update_dividend_info(symbol, conn, force=False):
                 days_until = (ex_date - date.today()).days
 
         # Store in DB
-        conn.execute("""
+        conn.execute(f"""
             UPDATE {TARGET_TABLE}
             SET has_dividend = ?, next_dividend_date = ?, days_until_dividend = ?, last_dividend_check = ?
             WHERE symbol = ?
@@ -144,7 +144,18 @@ def update_dividend_info(symbol, conn, force=False):
     except Exception as e:
         print(f"❌ Dividend update failed for {symbol}: {e}")
 
-def check_outperformance_vs_sector_etf(ticker_list, period="1mo"):
+
+def check_dividend_info():
+    conn = sqlite3.connect(DB_PATH)
+    symbol = "T"
+    sector = "Communication Services"
+    print(f"{symbol}: sector={sector}")
+
+    # 1. Update dividend info
+    update_dividend_info(symbol, conn)
+
+
+def check_outperformance_vs_sector_etf(ticker_list, maxprice=120, period="1mo"):
     import yfinance as yf
     import sqlite3
     import pandas as pd
@@ -184,7 +195,7 @@ def check_outperformance_vs_sector_etf(ticker_list, period="1mo"):
             print(f"[{idx+1}/{len(ticker_sectors)}] {symbol}: sector={sector}")
 
             # 1. Update dividend info
-            update_dividend_info(symbol, conn)
+            #update_dividend_info(symbol, conn)
             # Fetch updated dividend info
             cursor = conn.execute("""
                 SELECT has_dividend, days_until_dividend
@@ -213,8 +224,8 @@ def check_outperformance_vs_sector_etf(ticker_list, period="1mo"):
 
             try:
                 price = yf.Ticker(symbol).history(period="1d")["Close"].iloc[-1]
-                if price > 120:
-                    print(f"⛔ {symbol} skipped (last price ${price:.2f} > 120)")
+                if price > maxprice:
+                    print(f"⛔ {symbol} skipped (last price ${price:.2f} > {maxprice}")
                     continue
             except:
                 print(f"⚠️ Failed to get last price for {symbol}")
@@ -238,7 +249,7 @@ def check_outperformance_vs_sector_etf(ticker_list, period="1mo"):
         df["evaluated_at"] = today = datetime.date.today().isoformat()
 
         # Save to separate database
-        candidates_db = "data/candidates.db"
+        candidates_db = "databases/candidates.db"
         with sqlite3.connect(candidates_db) as out_conn:
             df.to_sql("candidates", out_conn, if_exists="replace", index=False)
 
@@ -248,12 +259,12 @@ def check_outperformance_vs_sector_etf(ticker_list, period="1mo"):
     finally:
         conn.close()
 
-def main():
+def main(min_cap, maxprice, period):
     
-    df=list_large_optionable_tickers(min_cap=100_000_000_000)
+    df=list_large_optionable_tickers(min_cap=min_cap)
     tickers = df["symbol"].tolist()
-    candidates = check_outperformance_vs_sector_etf(tickers, period="6mo")
+    candidates = check_outperformance_vs_sector_etf(tickers, maxprice, period=period)
     print(candidates)
 
 if __name__ == "__main__":
-    main()
+    main(100_000_000_000, 120, "6mo")

@@ -6,8 +6,8 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
-DB_PATH = "data/candidates.db"
-BASE_PATH = "./ticker_dbs"
+DB_PATH = "databases/candidates.db"
+BASE_PATH = "./databases/ticker_dbs"
 
 SECTOR_ETF_MAP = {
     "Technology": "XLK",
@@ -22,7 +22,7 @@ SECTOR_ETF_MAP = {
     "Real Estate": "XLRE",
     "Communication Services": "XLC"
 }
-def alter_price_cache_add_close_price(db_path="data/tickers.db"):
+def alter_price_cache_add_close_price(db_path="databases/tickers.db"):
     import sqlite3
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
@@ -122,9 +122,9 @@ def display_candidates_by_sector(only_outperforming=False, only_with_dividends=F
         conn.close()
 
 def get_flat_candidate_table_with_prices(only_outperforming=False, only_with_dividends=False):
-    db_path = "data/candidates.db"
+    db_path = "databases/candidates.db"
     conn = sqlite3.connect(db_path)
-    db_cache = "data/tickers.db"
+    db_cache = "databases/tickers.db"
     conn_cache = sqlite3.connect(db_cache)
 
     try:
@@ -172,8 +172,8 @@ def get_flat_candidate_table_with_prices(only_outperforming=False, only_with_div
 def plot_sector_price_histories():
 
     PERIOD = "3mo"
-    DB_CANDIDATES = "data/candidates.db"
-    DB_TICKERS = "data/tickers.db"
+    DB_CANDIDATES = "databases/candidates.db"
+    DB_TICKERS = "databases/tickers.db"
     HISTORY_TABLE = "price_history"
 
     def ensure_price_history_table(conn):

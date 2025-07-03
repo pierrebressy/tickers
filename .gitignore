@@ -1,1 +1,5 @@
 .DS_Store
+__pycache__/
+python-branch-copy/
+ticker_env/
+static\ copy/

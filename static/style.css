@@ -9,10 +9,6 @@ h1 {
     color: #333;
 }
 
-.button-container {
-    margin-bottom: 2rem;
-}
-
 .btn {
     display: inline-block;
     background-color: #007BFF;
@@ -25,9 +21,23 @@ h1 {
     font-size: 16px;
     transition: background-color 0.3s ease;
 }
+.btn.disabled {
+    background-color: #ccc;
+    color: #666;
+    pointer-events: none;  /* désactive les clics */
+    cursor: not-allowed;
+}
 
 .btn:hover {
     background-color: #0056b3;
+}
+.button-container {
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;  /* 👈 aligne tous les éléments en haut */
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 table {

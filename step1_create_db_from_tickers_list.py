@@ -2,9 +2,9 @@ import sqlite3
 import pandas as pd
 
 # Local file paths
-NASDAQ_FILE = "data/nasdaqlisted.txt"
-NYSE_FILE = "data/otherlisted.txt"
-DB_FILE = "data/tickers.db"
+NASDAQ_FILE = "databases/nasdaqlisted.txt"
+NYSE_FILE = "databases/otherlisted.txt"
+DB_FILE = "databases/tickers.db"
 
 def process_files(nasdaq_file, nyse_file):
     # Read NASDAQ file

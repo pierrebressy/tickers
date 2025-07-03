@@ -6,6 +6,7 @@ import sqlite3
 import pandas as pd
 import datetime
 
+
 SECTOR_ETF_MAP = {
     "Technology": "XLK",
     "Financial Services": "XLF",
@@ -20,9 +21,36 @@ SECTOR_ETF_MAP = {
     "Communication Services": "XLC"
 }
 
+def get_start_date_from_period(period):
+    today = datetime.datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+    if period.endswith("m"):
+        months = int(period[:-1])
+        return today - pd.DateOffset(months=months)
+    elif period.endswith("y"):
+        years = int(period[:-1])
+        return today - pd.DateOffset(years=years)
+    else:
+        return None
+
+def get_start_date_from_period_old(period):
+    if period.endswith("d"):
+        days = int(period[:-1])
+        return datetime.datetime.today() - datetime.timedelta(days=days)
+    elif period.endswith("mo"):
+        months = int(period[:-2])
+        return datetime.datetime.today() - datetime.timedelta(days=30 * months)
+    elif period.endswith("y"):
+        years = int(period[:-1])
+        return datetime.datetime.today() - datetime.timedelta(days=365 * years)
+    elif period == "ytd":
+        return datetime.datetime(datetime.datetime.today().year, 1, 1)
+    elif period == "max":
+        return None  # keep all
+    else:
+        return datetime.datetime.today() - datetime.timedelta(days=365)  # fallback to 1y
+
+
 def get_or_fetch_price(symbol, conn, today=None):
-    import datetime
-    import yfinance as yf
 
     if today is None:
         today = datetime.date.today().isoformat()
@@ -57,9 +85,9 @@ def get_or_fetch_price(symbol, conn, today=None):
 
 
 def get_flat_candidate_table_with_prices(only_outperforming=False, only_with_dividends=False):
-    db_path = "data/candidates.db"
+    db_path = "databases/candidates.db"
     conn = sqlite3.connect(db_path)
-    db_cache = "data/tickers.db"
+    db_cache = "databases/tickers.db"
     conn_cache = sqlite3.connect(db_cache)
 
     try:
@@ -105,7 +133,7 @@ def get_flat_candidate_table_with_prices(only_outperforming=False, only_with_div
         conn.close()
 
 
-def plot_etf_tickers(etf, tickers, base_path="./ticker_dbs"):
+def plot_etf_tickers(etf, tickers, base_path="./databases/ticker_dbs"):
     if not tickers:
         print(f"No tickers found for ETF '{etf}'.")
         return
@@ -135,7 +163,7 @@ def plot_etf_tickers(etf, tickers, base_path="./ticker_dbs"):
     plt.tight_layout()
     plt.show()
 
-def unused_plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs"):
+def unused_plot_etf_tickers_relative(etf, tickers, base_path="./databases/ticker_dbs"):
     if not tickers:
         print(f"No tickers found for ETF '{etf}'.")
         return
@@ -177,19 +205,18 @@ def unused_plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs"):
     plt.tight_layout()
     plt.show()
 
-
-def plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs", output_dir="./etf_charts"):
+def plot_etf_tickers_relative(etf, tickers, base_path="./databases/ticker_dbs", output_dir="./etf_charts", period="6m"):
     if not tickers:
         print(f"No tickers found for ETF '{etf}'.")
         return
 
-    # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
-
-    # Ensure ETF is included and not duplicated
     tickers = [etf] + [t for t in tickers if t != etf]
 
-    # Step 1: Collect last prices
+    # Calculate start date
+    start_date = get_start_date_from_period(period)
+    start_date = pd.to_datetime(start_date).normalize()
+
     ticker_data = []
     for ticker in tickers:
         db_path = os.path.join(base_path, f"{ticker}.db")
@@ -201,6 +228,14 @@ def plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs", output_dir
             with sqlite3.connect(db_path) as conn:
                 df = pd.read_sql("SELECT Date, Close FROM history", conn, parse_dates=["Date"])
                 df.sort_values("Date", inplace=True)
+                df["Date"] = pd.to_datetime(df["Date"])
+
+                # Filter by period
+                df = df[df["Date"] >= start_date]
+                if df.empty:
+                    print(f"No data for {ticker} after {start_date.date()}. Skipping.")
+                    continue
+
                 last_price = df["Close"].iloc[-1]
                 ticker_data.append((ticker, df, last_price))
         except Exception as e:
@@ -211,22 +246,21 @@ def plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs", output_dir
         print("No valid data to plot.")
         return
 
-    # Step 2: Sort by last price
-    ticker_data.sort(key=lambda x: x[2])  # x[2] is last_price
+    ticker_data.sort(key=lambda x: x[2])
 
-    # Step 3: Plot
     plt.figure(figsize=(14, 7))
 
     for i, (ticker, df, last_price) in enumerate(ticker_data):
         df["Pct"] = (df["Close"] / df["Close"].iloc[0] - 1) * 100
-        label = f"{ticker} (${last_price:.2f})"
+        perf = df["Pct"].iloc[-1]
+        label = f"{ticker} (${last_price:.2f}, {perf:+.1f}%)"
         if ticker == etf:
             label += " (ETF)"
             plt.plot(df["Date"], df["Pct"], label=label, linewidth=3.5, linestyle="--")
         else:
             plt.plot(df["Date"], df["Pct"], label=label, linewidth=1.2)
 
-    plt.title(f"{etf} & Tickers — Relative 1-Year Performance (%)")
+    plt.title(f"{etf} & Tickers — Relative {period.upper()} Performance (%)")
     plt.xlabel("Date")
     plt.ylabel("Performance vs start (%)")
     plt.axhline(0, color='gray', linestyle='--', linewidth=0.7)
@@ -234,18 +268,18 @@ def plot_etf_tickers_relative(etf, tickers, base_path="./ticker_dbs", output_dir
     plt.grid(True)
     plt.tight_layout()
 
-    # Step 4: Save the plot
     save_path = os.path.join(output_dir, f"{etf}_relative.png")
     plt.savefig(save_path, dpi=300)
     plt.close()
-    print(f"Saved plot to {save_path}")
+    print(f"✅ Saved plot to {save_path}")
 
-def plot_all_sector_etfs_relative(etf_list, base_path="./ticker_dbs", output_path="static/graphs"):
+def plot_all_sector_etfs_relative(etf_list, base_path="./databases/ticker_dbs", output_path="static/graphs", period="6m"):
 
     plt.figure(figsize=(14, 7))
 
     data = []
     for etf in etf_list:
+        start_date = get_start_date_from_period(period)
         db_path = os.path.join(base_path, f"{etf}.db")
         if not os.path.exists(db_path):
             print(f"DB for {etf} not found. Skipping.")
@@ -254,10 +288,20 @@ def plot_all_sector_etfs_relative(etf_list, base_path="./ticker_dbs", output_pat
         try:
             with sqlite3.connect(db_path) as conn:
                 df = pd.read_sql("SELECT Date, Close FROM history", conn, parse_dates=["Date"])
+                df["Date"] = pd.to_datetime(df["Date"])
+
                 df.sort_values("Date", inplace=True)
+
+                if start_date:
+                    df = df[df["Date"] >= start_date]
+                if df.empty:
+                    continue
+
                 df["Pct"] = (df["Close"] / df["Close"].iloc[0] - 1) * 100
+                perf = df["Pct"].iloc[-1]
                 last_price = df["Close"].iloc[-1]
-                label = f"{etf} (${last_price:.2f})"
+                #label = f"{etf} (${last_price:.2f})"
+                label = f"{etf} (${last_price:.2f}, {perf:+.1f}%)"
                 data.append((etf, df["Date"], df["Pct"], label))
         except Exception as e:
             print(f"Error reading {etf}: {e}")
@@ -265,7 +309,6 @@ def plot_all_sector_etfs_relative(etf_list, base_path="./ticker_dbs", output_pat
 
     # Optional: sort by last performance
     data.sort(key=lambda x: x[2].iloc[-1])  # Sort by last % return
-
     for etf, dates, pct, label in data:
         plt.plot(dates, pct, label=label)
 
@@ -283,10 +326,6 @@ def plot_all_sector_etfs_relative(etf_list, base_path="./ticker_dbs", output_pat
 
 
 def main():
-
-    os.makedirs("static/logs", exist_ok=True)
-    with open("static/logs/generate_graphs.log", "w") as f:
-        f.write("🔄 Starting graph generation...\n")
 
     output_dir = "static/graphs"
     df_flat = get_flat_candidate_table_with_prices(only_outperforming=True, only_with_dividends=True)
