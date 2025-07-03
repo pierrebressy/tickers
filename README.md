@@ -14,5 +14,8 @@ pip install -r requirements.txt
 ```
 ## Run the Flask server
 ```bash
+source ticker_env/bin/activate
 python3 app.py
 ```
+Then open http://127.0.0.1:5052/
+
