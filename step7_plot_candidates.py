@@ -205,7 +205,75 @@ def unused_plot_etf_tickers_relative(etf, tickers, base_path="./databases/ticker
     plt.tight_layout()
     plt.show()
 
+
 def plot_etf_tickers_relative(etf, tickers, base_path="./databases/ticker_dbs", output_dir="./etf_charts", period="6m"):
+    if not tickers:
+        print(f"No tickers found for ETF '{etf}'.")
+        return
+
+    os.makedirs(output_dir, exist_ok=True)
+    tickers = [etf] + [t for t in tickers if t != etf]
+
+    start_date = get_start_date_from_period(period)
+    start_date = pd.to_datetime(start_date).normalize()
+
+    ticker_data = []
+    for ticker in tickers:
+        db_path = os.path.join(base_path, f"{ticker}.db")
+        if not os.path.exists(db_path):
+            print(f"DB for {ticker} not found. Skipping.")
+            continue
+
+        try:
+            with sqlite3.connect(db_path) as conn:
+                df = pd.read_sql("SELECT Date, Close FROM history", conn, parse_dates=["Date"])
+                df.sort_values("Date", inplace=True)
+                df["Date"] = pd.to_datetime(df["Date"])
+                df = df[df["Date"] >= start_date]
+                if df.empty:
+                    print(f"No data for {ticker} after {start_date.date()}. Skipping.")
+                    continue
+
+                df["Pct"] = (df["Close"] / df["Close"].iloc[0] - 1) * 100
+                last_price = df["Close"].iloc[-1]
+                perf = df["Pct"].iloc[-1]
+                ticker_data.append((ticker, df, last_price, perf))
+        except Exception as e:
+            print(f"Error reading {ticker}: {e}")
+            continue
+
+    if not ticker_data:
+        print("No valid data to plot.")
+        return
+
+    # Sort by performance (ascending)
+    ticker_data.sort(key=lambda x: x[3], reverse=True)
+
+    plt.figure(figsize=(14, 7))
+
+    for ticker, df, last_price, perf in ticker_data:
+        label = f"{ticker} (${last_price:.2f}, {perf:+.1f}%)"
+        if ticker == etf:
+            label += " (ETF)"
+            plt.plot(df["Date"], df["Pct"], label=label, linewidth=3.5, linestyle="--")
+        else:
+            plt.plot(df["Date"], df["Pct"], label=label, linewidth=1.2)
+
+    plt.title(f"{etf} & Tickers — Relative {period.upper()} Performance (%)")
+    plt.xlabel("Date")
+    plt.ylabel("Performance vs start (%)")
+    plt.axhline(0, color='gray', linestyle='--', linewidth=0.7)
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    save_path = os.path.join(output_dir, f"{etf}_relative.png")
+    plt.savefig(save_path, dpi=300)
+    plt.close()
+    print(f"✅ Saved plot to {save_path}")
+
+
+def plot_etf_tickers_relative3(etf, tickers, base_path="./databases/ticker_dbs", output_dir="./etf_charts", period="6m"):
     if not tickers:
         print(f"No tickers found for ETF '{etf}'.")
         return
@@ -246,7 +314,8 @@ def plot_etf_tickers_relative(etf, tickers, base_path="./databases/ticker_dbs", 
         print("No valid data to plot.")
         return
 
-    ticker_data.sort(key=lambda x: x[2])
+    #ticker_data.sort(key=lambda x: x[2])
+    ticker_data.sort(key=lambda x: x[2], reverse=True)
 
     plt.figure(figsize=(14, 7))
 
